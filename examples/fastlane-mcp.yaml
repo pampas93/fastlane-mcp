@@ -1,0 +1,27 @@
+app_name: Example RN App
+platform: android
+project_root: /absolute/path/to/app
+android_dir: android
+package_name: com.example.app
+default_track: internal
+
+artifacts:
+  aab_glob: android/app/build/outputs/bundle/**/*.aab
+  apk_glob: android/app/build/outputs/apk/**/*.apk
+
+play:
+  json_key_file: ${GOOGLE_PLAY_JSON_KEY_FILE}
+  metadata_dir: fastlane/metadata/android
+  images_dir: fastlane/metadata/android
+  changelogs_dir: fastlane/metadata/android
+  default_language: en-US
+
+gradle:
+  build_aab_task: bundleRelease
+  build_apk_task: assembleRelease
+
+defaults:
+  changes_not_sent_for_review: true
+  skip_upload_metadata: false
+  skip_upload_images: false
+  skip_upload_changelogs: false

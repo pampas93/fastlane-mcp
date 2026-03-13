@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Local config and secrets
+.env
+.env.local
+play-service-account*.json
+*.keystore
+*.jks
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
