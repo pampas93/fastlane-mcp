@@ -25,6 +25,20 @@ from .android_tools import (
     healthcheck,
     list_supported_actions,
 )
+from .ios_tools import (
+    ios_create_app,
+    ios_distribute_testflight_build,
+    ios_get_latest_build_info,
+    ios_manage_testflight_testers,
+    ios_precheck,
+    ios_show_effective_config,
+    ios_sync_code_signing,
+    ios_upload_app_privacy_details,
+    ios_upload_metadata,
+    ios_upload_screenshots,
+    ios_upload_to_app_store,
+    ios_upload_to_testflight,
+)
 
 
 def configure_logging() -> None:
@@ -42,7 +56,7 @@ configure_logging()
 mcp = FastMCP(
     name="fastlane-mcp",
     instructions=(
-        "Thin MCP server over Gradle and fastlane for Android / React Native release workflows. "
+        "Thin MCP server over Gradle and fastlane for Android, iOS, and React Native release workflows. "
         "Prefer doctor before build or upload commands when project setup is unknown."
     ),
 )
@@ -63,6 +77,18 @@ mcp.tool(android_upload_changelogs)
 mcp.tool(android_upload_everything)
 mcp.tool(android_get_latest_build_info)
 mcp.tool(android_show_effective_config)
+mcp.tool(ios_upload_to_testflight)
+mcp.tool(ios_distribute_testflight_build)
+mcp.tool(ios_manage_testflight_testers)
+mcp.tool(ios_upload_to_app_store)
+mcp.tool(ios_create_app)
+mcp.tool(ios_upload_metadata)
+mcp.tool(ios_upload_screenshots)
+mcp.tool(ios_upload_app_privacy_details)
+mcp.tool(ios_precheck)
+mcp.tool(ios_get_latest_build_info)
+mcp.tool(ios_show_effective_config)
+mcp.tool(ios_sync_code_signing)
 
 
 def main() -> None:

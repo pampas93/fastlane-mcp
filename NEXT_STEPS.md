@@ -1,0 +1,3 @@
+- Manually verify the new iOS tools against a real App Store Connect API key and Apple account in the Luna Cradle app repo, especially `ios_create_app` and `ios_upload_app_privacy_details`, because those flows depend on Apple-side auth and account state.
+- Add integration tests that stub `run_command` for the new iOS tool entrypoints, not just helper-level command construction tests.
+- Decide whether to add iOS build/export tools next so `fastlane-mcp` can produce the IPA before upload instead of only consuming an existing artifact.

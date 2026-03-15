@@ -38,11 +38,11 @@ def detect_version(command: list[str], timeout: int = 15) -> tuple[bool, str | N
     return completed.returncode == 0, output or None, None if completed.returncode == 0 else output
 
 
-def find_bundle_context(project_root: str, android_dir: str) -> tuple[list[str], Path]:
+def find_bundle_context(project_root: str, platform_dir: str) -> tuple[list[str], Path]:
     """Prefer bundle exec fastlane when a Gemfile exists."""
     candidates = [
         Path(project_root).resolve(),
-        Path(project_root, android_dir).resolve(),
+        Path(project_root, platform_dir).resolve(),
     ]
     if which("bundle"):
         for candidate in candidates:

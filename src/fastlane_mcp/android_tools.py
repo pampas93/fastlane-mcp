@@ -102,6 +102,8 @@ def _serialize_fastlane_value(value: Any) -> str:
         return "true" if value else "false"
     if isinstance(value, float):
         return f"{value:.4f}".rstrip("0").rstrip(".")
+    if isinstance(value, (list, tuple, set)):
+        return ",".join(str(item) for item in value)
     return str(value)
 
 
@@ -111,8 +113,9 @@ def _build_fastlane_command(
     action: str,
     params: dict[str, Any],
     sensitive_values: list[str] | None = None,
+    working_dir: str | None = None,
 ) -> tuple[list[str], Path, list[str]]:
-    base_command, cwd = find_bundle_context(config.project_root, config.android_dir)
+    base_command, cwd = find_bundle_context(config.project_root, working_dir or config.android_dir)
     command = [*base_command, "run", action]
     collected_sensitive_values = list(sensitive_values or [])
     for key, value in params.items():
@@ -139,10 +142,14 @@ def _gradle_command(android_dir: Path, task: str, clean: bool) -> list[str]:
     return command
 
 
-def _find_artifact(config: AppConfig, kind: Literal["aab", "apk"], override: str | None = None) -> Path:
+def _find_artifact(config: AppConfig, kind: Literal["aab", "apk", "ipa"], override: str | None = None) -> Path:
     if override:
         return require_file(normalize_path(override, config.project_root), kind)
-    pattern = config.artifacts.aab_glob if kind == "aab" else config.artifacts.apk_glob
+    pattern = {
+        "aab": config.artifacts.aab_glob,
+        "apk": config.artifacts.apk_glob,
+        "ipa": config.artifacts.ipa_glob,
+    }[kind]
     found = find_latest_match(config.project_root, pattern)
     if not found:
         raise ValidationError(
@@ -317,12 +324,21 @@ def doctor(project_root: str, app_config_path: str | None = None) -> dict[str, A
         )
 
     android_dir = normalize_path(config.android_dir, config.project_root)
+    ios_dir = normalize_path(config.ios_dir, config.project_root)
     checks.append(
         DoctorCheck(
             name="android_dir",
             ok=android_dir.is_dir(),
             severity="error" if not android_dir.is_dir() else "info",
             detail=f"Android directory {'found' if android_dir.is_dir() else 'missing'} at {android_dir}",
+        )
+    )
+    checks.append(
+        DoctorCheck(
+            name="ios_dir",
+            ok=ios_dir.is_dir(),
+            severity="warning" if not ios_dir.is_dir() else "info",
+            detail=f"iOS directory {'found' if ios_dir.is_dir() else 'missing'} at {ios_dir}",
         )
     )
 
@@ -371,6 +387,16 @@ def doctor(project_root: str, app_config_path: str | None = None) -> dict[str, A
             detail="package_name configured." if config.package_name else "package_name is missing; Play uploads will fail.",
         )
     )
+    checks.append(
+        DoctorCheck(
+            name="bundle_identifier",
+            ok=bool(config.bundle_identifier),
+            severity="warning" if not config.bundle_identifier else "info",
+            detail="bundle_identifier configured."
+            if config.bundle_identifier
+            else "bundle_identifier is missing; App Store and TestFlight uploads will fail.",
+        )
+    )
 
     for label, value in {
         "metadata_dir": config.play.metadata_dir,
@@ -398,6 +424,32 @@ def doctor(project_root: str, app_config_path: str | None = None) -> dict[str, A
             detail="Google Play credentials configured." if has_auth else "No Play auth configured.",
         )
     )
+    has_apple_auth = bool(config.apple.api_key_path or config.apple.api_key_content or config.apple.username)
+    checks.append(
+        DoctorCheck(
+            name="apple_auth",
+            ok=has_apple_auth,
+            severity="warning" if not has_apple_auth else "info",
+            detail="Apple auth configured." if has_apple_auth else "No Apple auth configured.",
+        )
+    )
+    for label, value in {
+        "apple_metadata_dir": config.apple.metadata_dir,
+        "apple_screenshots_dir": config.apple.screenshots_dir,
+        "apple_privacy_details_path": config.apple.privacy_details_path,
+    }.items():
+        if not value:
+            continue
+        path = normalize_path(value, config.project_root)
+        is_ok = path.exists()
+        checks.append(
+            DoctorCheck(
+                name=label,
+                ok=is_ok,
+                severity="warning" if not is_ok else "info",
+                detail=f"{label} {'found' if is_ok else 'missing'} at {path}",
+            )
+        )
 
     success = not any(check.severity == "error" and not check.ok for check in checks)
     return _base_success(
@@ -426,6 +478,18 @@ def list_supported_actions() -> dict[str, Any]:
         SupportedAction("android_upload_everything", "metadata", "Upload binary plus metadata assets.", "fastlane upload_to_play_store"),
         SupportedAction("android_get_latest_build_info", "introspection", "Read latest release info for a track.", "fastlane google_play_track_version_codes + google_play_track_release_names"),
         SupportedAction("android_show_effective_config", "introspection", "Show merged config with secrets redacted.", "Config loader"),
+        SupportedAction("ios_upload_to_testflight", "release", "Upload an iOS build to TestFlight.", "fastlane upload_to_testflight"),
+        SupportedAction("ios_distribute_testflight_build", "release", "Distribute an existing TestFlight build to tester groups.", "fastlane upload_to_testflight distribute_only"),
+        SupportedAction("ios_manage_testflight_testers", "release", "Manage TestFlight testers and groups.", "fastlane pilot"),
+        SupportedAction("ios_upload_to_app_store", "release", "Upload an iOS build plus App Store assets.", "fastlane upload_to_app_store"),
+        SupportedAction("ios_create_app", "release", "Create a new app in App Store Connect.", "fastlane produce"),
+        SupportedAction("ios_upload_metadata", "metadata", "Upload App Store text metadata.", "fastlane upload_to_app_store"),
+        SupportedAction("ios_upload_screenshots", "metadata", "Upload App Store screenshots.", "fastlane upload_to_app_store"),
+        SupportedAction("ios_upload_app_privacy_details", "metadata", "Upload App Privacy Details.", "fastlane upload_app_privacy_details_to_app_store"),
+        SupportedAction("ios_precheck", "metadata", "Validate App Store metadata before submission.", "fastlane precheck"),
+        SupportedAction("ios_get_latest_build_info", "introspection", "Read latest TestFlight and App Store build numbers.", "fastlane latest_testflight_build_number + app_store_build_number"),
+        SupportedAction("ios_show_effective_config", "introspection", "Show merged config with Apple and Play secrets redacted.", "Config loader"),
+        SupportedAction("ios_sync_code_signing", "signing", "Sync certificates and profiles with match.", "fastlane match"),
     ]
     return _base_success(
         "list_supported_actions",

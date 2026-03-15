@@ -92,13 +92,17 @@ def env_config() -> dict[str, Any]:
     )
     return {
         "app_name": env.get("FASTLANE_MCP_APP_NAME"),
+        "platform": env.get("FASTLANE_MCP_PLATFORM"),
         "project_root": env.get("FASTLANE_MCP_PROJECT_ROOT"),
         "android_dir": env.get("FASTLANE_MCP_ANDROID_DIR"),
+        "ios_dir": env.get("FASTLANE_MCP_IOS_DIR"),
         "package_name": env.get("FASTLANE_MCP_PACKAGE_NAME"),
+        "bundle_identifier": env.get("FASTLANE_MCP_BUNDLE_IDENTIFIER"),
         "default_track": env.get("FASTLANE_MCP_DEFAULT_TRACK"),
         "artifacts": {
             "aab_glob": env.get("FASTLANE_MCP_AAB_GLOB"),
             "apk_glob": env.get("FASTLANE_MCP_APK_GLOB"),
+            "ipa_glob": env.get("FASTLANE_MCP_IPA_GLOB"),
         },
         "play": {
             "json_key_file": play_json_key_file,
@@ -107,6 +111,19 @@ def env_config() -> dict[str, Any]:
             "images_dir": env.get("FASTLANE_MCP_PLAY_IMAGES_DIR"),
             "changelogs_dir": env.get("FASTLANE_MCP_PLAY_CHANGELOGS_DIR"),
             "default_language": env.get("FASTLANE_MCP_PLAY_DEFAULT_LANGUAGE"),
+        },
+        "apple": {
+            "api_key_path": env.get("FASTLANE_MCP_APPLE_API_KEY_PATH"),
+            "api_key_content": env.get("FASTLANE_MCP_APPLE_API_KEY_CONTENT"),
+            "username": env.get("FASTLANE_MCP_APPLE_USERNAME"),
+            "metadata_dir": env.get("FASTLANE_MCP_APPLE_METADATA_DIR"),
+            "screenshots_dir": env.get("FASTLANE_MCP_APPLE_SCREENSHOTS_DIR"),
+            "privacy_details_path": env.get("FASTLANE_MCP_APPLE_PRIVACY_DETAILS_PATH"),
+            "team_id": env.get("FASTLANE_MCP_APPLE_TEAM_ID"),
+            "team_name": env.get("FASTLANE_MCP_APPLE_TEAM_NAME"),
+            "itc_team_id": env.get("FASTLANE_MCP_APPLE_ITC_TEAM_ID"),
+            "itc_team_name": env.get("FASTLANE_MCP_APPLE_ITC_TEAM_NAME"),
+            "default_platform": env.get("FASTLANE_MCP_APPLE_DEFAULT_PLATFORM"),
         },
         "gradle": {
             "build_aab_task": env.get("FASTLANE_MCP_GRADLE_BUILD_AAB_TASK"),
@@ -162,6 +179,7 @@ def load_app_config(
         )
 
     merged.setdefault("android_dir", "android")
+    merged.setdefault("ios_dir", "ios")
     merged.setdefault("default_track", "internal")
     merged["config_path"] = str(file_path) if file_path else None
     return AppConfig.model_validate(merged)

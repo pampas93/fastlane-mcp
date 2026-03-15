@@ -1,13 +1,16 @@
 app_name: Example RN App
-platform: android
+platform: react-native
 project_root: /absolute/path/to/app
 android_dir: android
+ios_dir: ios
 package_name: com.example.app
+bundle_identifier: com.example.app
 default_track: internal
 
 artifacts:
   aab_glob: android/app/build/outputs/bundle/**/*.aab
   apk_glob: android/app/build/outputs/apk/**/*.apk
+  ipa_glob: ios/build/**/*.ipa
 
 play:
   json_key_file: ${GOOGLE_PLAY_JSON_KEY_FILE}
@@ -15,6 +18,14 @@ play:
   images_dir: fastlane/metadata/android
   changelogs_dir: fastlane/metadata/android
   default_language: en-US
+
+apple:
+  api_key_path: ${APP_STORE_CONNECT_API_KEY_PATH}
+  username: ${FASTLANE_USER}
+  metadata_dir: fastlane/metadata/ios
+  screenshots_dir: fastlane/screenshots
+  privacy_details_path: fastlane/app_privacy_details.json
+  default_platform: ios
 
 gradle:
   build_aab_task: bundleRelease

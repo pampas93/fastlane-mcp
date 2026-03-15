@@ -1,13 +1,13 @@
 # fastlane-mcp
 
-`fastlane-mcp` is a local, open-source MCP server that exposes a clean tool interface over Android release workflows powered by Gradle and fastlane.
+`fastlane-mcp` is a local, open-source MCP server that exposes a clean tool interface over Android and iOS release workflows powered by Gradle and fastlane.
 
 It is designed for this exact setup:
 
 - This repo is the MCP server repo, not an individual app repo.
 - Target apps are existing Android or React Native apps.
 - Each app should provide a small config file or environment variables instead of duplicating a large `fastlane/` setup.
-- v1 is local-first, Android-only, and optimized for Google Play release flows.
+- v1 is local-first and optimized for Google Play and App Store Connect release flows.
 
 ## Why put MCP on top of fastlane?
 
@@ -33,12 +33,14 @@ The design goal is not to replace fastlane. It is to make fastlane easier to con
 - Metadata, image, and changelog uploads
 - Track promotion
 - Play auth validation
+- iOS TestFlight uploads and distribution
+- App Store uploads for binaries, metadata, screenshots, and privacy details
+- App creation, precheck, build-number introspection, and signing sync
 - Effective config inspection
 - Basic doctor / healthcheck workflows
 
 ### Non-goals in v1
 
-- iOS
 - Cloud hosting
 - Checking Play credentials into source control
 - Replacing the need for an app that already exists in Play Console
@@ -56,7 +58,9 @@ The codebase is intentionally small and thin:
 - `src/fastlane_mcp/fastlane_runner.py`
   Safe subprocess execution, Bundler detection, output normalization
 - `src/fastlane_mcp/android_tools.py`
-  Tool implementations for Android build, upload, metadata, and introspection flows
+  Tool implementations for Android build, upload, metadata, diagnostics, and introspection flows
+- `src/fastlane_mcp/ios_tools.py`
+  Tool implementations for TestFlight, App Store Connect, and signing flows
 - `src/fastlane_mcp/validators.py`
   Input validation and artifact lookup helpers
 - `src/fastlane_mcp/exceptions.py`

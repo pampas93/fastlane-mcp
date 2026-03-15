@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 class ArtifactsConfig(BaseModel):
@@ -12,6 +12,7 @@ class ArtifactsConfig(BaseModel):
 
     aab_glob: str = "android/app/build/outputs/bundle/**/*.aab"
     apk_glob: str = "android/app/build/outputs/apk/**/*.apk"
+    ipa_glob: str = "ios/build/**/*.ipa"
 
 
 class PlayConfig(BaseModel):
@@ -42,27 +43,39 @@ class DefaultsConfig(BaseModel):
     skip_upload_changelogs: bool = False
 
 
+class AppleConfig(BaseModel):
+    """App Store Connect / fastlane Apple configuration."""
+
+    api_key_path: str | None = None
+    api_key_content: str | None = None
+    username: str | None = None
+    metadata_dir: str | None = "fastlane/metadata/ios"
+    screenshots_dir: str | None = "fastlane/screenshots"
+    privacy_details_path: str | None = "fastlane/app_privacy_details.json"
+    team_id: str | None = None
+    team_name: str | None = None
+    itc_team_id: str | None = None
+    itc_team_name: str | None = None
+    default_platform: str = "ios"
+
+
 class AppConfig(BaseModel):
     """Resolved app configuration used by all tools."""
 
     app_name: str | None = None
-    platform: Literal["android"] = "android"
+    platform: Literal["android", "ios", "react-native"] = "android"
     project_root: str
     android_dir: str = "android"
+    ios_dir: str = "ios"
     package_name: str | None = None
+    bundle_identifier: str | None = None
     default_track: str = "internal"
     artifacts: ArtifactsConfig = Field(default_factory=ArtifactsConfig)
     play: PlayConfig = Field(default_factory=PlayConfig)
+    apple: AppleConfig = Field(default_factory=AppleConfig)
     gradle: GradleConfig = Field(default_factory=GradleConfig)
     defaults: DefaultsConfig = Field(default_factory=DefaultsConfig)
     config_path: str | None = None
-
-    @field_validator("platform")
-    @classmethod
-    def validate_platform(cls, value: str) -> str:
-        if value != "android":
-            raise ValueError("Only android is supported in v1.")
-        return value
 
 
 class HealthCheckItem(BaseModel):
