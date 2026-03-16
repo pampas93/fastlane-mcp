@@ -254,6 +254,13 @@ play:
   changelogs_dir: fastlane/metadata/android
   default_language: en-US
 
+apple:
+  api_key_path: ${APP_STORE_CONNECT_API_KEY_PATH}
+  metadata_dir: fastlane/metadata/ios
+  screenshots_dir: fastlane/screenshots
+  privacy_details_path: fastlane/app_privacy_details.json
+  age_rating_config_path: fastlane/age_rating_config.json
+
 gradle:
   build_aab_task: bundleRelease
   build_apk_task: assembleRelease
@@ -285,6 +292,7 @@ Important variables:
 - `FASTLANE_MCP_PLAY_IMAGES_DIR`
 - `FASTLANE_MCP_PLAY_CHANGELOGS_DIR`
 - `FASTLANE_MCP_PLAY_DEFAULT_LANGUAGE`
+- `FASTLANE_MCP_APPLE_AGE_RATING_CONFIG_PATH`
 - `FASTLANE_MCP_GRADLE_BUILD_AAB_TASK`
 - `FASTLANE_MCP_GRADLE_BUILD_APK_TASK`
 - `FASTLANE_MCP_DEFAULT_CHANGES_NOT_SENT_FOR_REVIEW`
@@ -302,6 +310,17 @@ Supported patterns:
 - Service account JSON content via env var
 
 If JSON content is provided through env vars, the server writes it to a temporary file at runtime so it can call fastlane safely without exposing raw JSON in command arguments.
+
+### iOS metadata and age ratings
+
+If your app repo includes `fastlane/age_rating_config.json`, add this to `fastlane-mcp.yaml`:
+
+```yaml
+apple:
+  age_rating_config_path: fastlane/age_rating_config.json
+```
+
+`ios_upload_metadata` and `ios_upload_to_app_store` will pass that file to fastlane as `app_rating_config_path`, which uploads the App Store age rating through the normal metadata flow.
 
 ### Required Play Console setup
 

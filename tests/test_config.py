@@ -26,6 +26,7 @@ play:
     assert config.package_name == "com.example.env"
     assert config.config_path == str(config_path.resolve())
     assert config.apple.metadata_dir == "fastlane/metadata/ios"
+    assert config.apple.age_rating_config_path == "fastlane/age_rating_config.json"
 
 
 def test_load_ios_config_from_file_and_env(monkeypatch, tmp_path: Path) -> None:
@@ -40,6 +41,7 @@ bundle_identifier: com.example.file
 apple:
   metadata_dir: fastlane/metadata/ios
   screenshots_dir: fastlane/screenshots
+  age_rating_config_path: fastlane/age_rating_config.json
 """.strip(),
         encoding="utf-8",
     )
@@ -53,6 +55,7 @@ apple:
     assert config.platform == "ios"
     assert config.bundle_identifier == "com.example.env"
     assert config.apple.username == "ios@example.com"
+    assert config.apple.age_rating_config_path == "fastlane/age_rating_config.json"
     assert config.config_path == str(config_path.resolve())
 
 

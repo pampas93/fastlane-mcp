@@ -25,6 +25,7 @@ apple:
   metadata_dir: fastlane/metadata/ios
   screenshots_dir: fastlane/screenshots
   privacy_details_path: fastlane/app_privacy_details.json
+  age_rating_config_path: fastlane/age_rating_config.json
   default_platform: ios
 
 gradle:

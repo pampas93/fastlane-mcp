@@ -32,6 +32,21 @@ def _resolve_apple_metadata_root(config: AppConfig, override: str | None, kind: 
     return require_directory(normalize_path(configured, config.project_root), f"{kind}_dir")
 
 
+def _resolve_age_rating_config_path(config: AppConfig, override: str | None) -> Path | None:
+    if override:
+        return require_file(
+            normalize_path(override, config.project_root),
+            "age_rating_config_path",
+        )
+
+    configured = config.apple.age_rating_config_path
+    if not configured:
+        return None
+
+    resolved = normalize_path(configured, config.project_root)
+    return resolved if resolved.is_file() else None
+
+
 def _resolve_apple_api_key(config: AppConfig, stack: ExitStack) -> tuple[Path, list[str]]:
     sensitive_values: list[str] = []
     if config.apple.api_key_path:
@@ -258,6 +273,7 @@ def _upload_to_app_store(
     ipa_path: str | None = None,
     metadata_dir: str | None = None,
     screenshots_dir: str | None = None,
+    age_rating_config_path: str | None = None,
     submit_for_review: bool = False,
     release_notes: str | None = None,
     skip_binary_upload: bool = False,
@@ -268,11 +284,13 @@ def _upload_to_app_store(
     with ExitStack() as stack:
         api_key_path, sensitive_values = _resolve_apple_api_key(config, stack)
         ipa: Path | None = None
+        age_rating_config = _resolve_age_rating_config_path(config, age_rating_config_path)
         params = {
             "api_key_path": str(api_key_path),
             "app_identifier": bundle_identifier,
             "metadata_path": str(_resolve_apple_metadata_root(config, metadata_dir, "metadata")) if not skip_metadata else None,
             "screenshots_path": str(_resolve_apple_metadata_root(config, screenshots_dir, "screenshots")) if not skip_screenshots else None,
+            "app_rating_config_path": str(age_rating_config) if age_rating_config else None,
             "submit_for_review": submit_for_review,
             "release_notes": release_notes,
             "skip_binary_upload": skip_binary_upload,
@@ -309,16 +327,18 @@ def ios_upload_to_app_store(
     project_root: str,
     app_config_path: str | None = None,
     ipa_path: str | None = None,
+    age_rating_config_path: str | None = None,
     submit_for_review: bool = False,
     release_notes: str | None = None,
 ) -> dict[str, Any]:
-    """Upload an iOS build, metadata, and screenshots to App Store Connect."""
+    """Upload an iOS build plus App Store metadata, screenshots, and optional age rating config."""
     try:
         config = _resolve_config(project_root, app_config_path)
         return _upload_to_app_store(
             tool_name="ios_upload_to_app_store",
             config=config,
             ipa_path=ipa_path,
+            age_rating_config_path=age_rating_config_path,
             submit_for_review=submit_for_review,
             release_notes=release_notes,
         )
@@ -330,14 +350,16 @@ def ios_upload_metadata(
     project_root: str,
     app_config_path: str | None = None,
     metadata_dir: str | None = None,
+    age_rating_config_path: str | None = None,
 ) -> dict[str, Any]:
-    """Upload App Store text metadata only."""
+    """Upload App Store text metadata and optional age rating config."""
     try:
         config = _resolve_config(project_root, app_config_path)
         return _upload_to_app_store(
             tool_name="ios_upload_metadata",
             config=config,
             metadata_dir=metadata_dir,
+            age_rating_config_path=age_rating_config_path,
             skip_binary_upload=True,
             skip_screenshots=True,
         )

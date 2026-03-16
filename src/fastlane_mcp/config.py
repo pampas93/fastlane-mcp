@@ -119,6 +119,7 @@ def env_config() -> dict[str, Any]:
             "metadata_dir": env.get("FASTLANE_MCP_APPLE_METADATA_DIR"),
             "screenshots_dir": env.get("FASTLANE_MCP_APPLE_SCREENSHOTS_DIR"),
             "privacy_details_path": env.get("FASTLANE_MCP_APPLE_PRIVACY_DETAILS_PATH"),
+            "age_rating_config_path": env.get("FASTLANE_MCP_APPLE_AGE_RATING_CONFIG_PATH"),
             "team_id": env.get("FASTLANE_MCP_APPLE_TEAM_ID"),
             "team_name": env.get("FASTLANE_MCP_APPLE_TEAM_NAME"),
             "itc_team_id": env.get("FASTLANE_MCP_APPLE_ITC_TEAM_ID"),

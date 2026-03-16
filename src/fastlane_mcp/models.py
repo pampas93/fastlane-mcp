@@ -52,6 +52,7 @@ class AppleConfig(BaseModel):
     metadata_dir: str | None = "fastlane/metadata/ios"
     screenshots_dir: str | None = "fastlane/screenshots"
     privacy_details_path: str | None = "fastlane/app_privacy_details.json"
+    age_rating_config_path: str | None = "fastlane/age_rating_config.json"
     team_id: str | None = None
     team_name: str | None = None
     itc_team_id: str | None = None
