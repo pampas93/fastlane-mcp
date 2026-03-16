@@ -143,6 +143,10 @@ def env_config() -> dict[str, Any]:
                 env.get("FASTLANE_MCP_DEFAULT_SKIP_UPLOAD_IMAGES"),
                 False,
             ),
+            "skip_upload_screenshots": bool_from_env(
+                env.get("FASTLANE_MCP_DEFAULT_SKIP_UPLOAD_SCREENSHOTS"),
+                False,
+            ),
             "skip_upload_changelogs": bool_from_env(
                 env.get("FASTLANE_MCP_DEFAULT_SKIP_UPLOAD_CHANGELOGS"),
                 False,

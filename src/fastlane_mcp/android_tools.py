@@ -23,6 +23,7 @@ from .validators import (
     require_directory,
     require_file,
     safe_excerpt,
+    validate_play_release_status,
     validate_rollout,
     validate_track_name,
 )
@@ -189,14 +190,17 @@ def _play_upload(
     aab_path: str | None = None,
     apk_path: str | None = None,
     release_notes: str | None = None,
+    release_status: str | None = None,
     changes_not_sent_for_review: bool | None = None,
     rollout: float | None = None,
     upload_metadata: bool = False,
     upload_images: bool = False,
+    upload_screenshots: bool = False,
     upload_changelogs: bool = False,
     metadata_root_override: str | None = None,
 ) -> dict[str, Any]:
     validate_track_name(track)
+    release_status = validate_play_release_status(release_status)
     validate_rollout(rollout)
     if not config.package_name:
         raise ConfigError("package_name is required for Google Play operations.")
@@ -209,7 +213,7 @@ def _play_upload(
             artifact_paths.append(_find_artifact(config, "aab", aab_path))
         if apk_path:
             artifact_paths.append(_find_artifact(config, "apk", apk_path))
-        if not artifact_paths and not any([upload_metadata, upload_images, upload_changelogs]):
+        if not artifact_paths and not any([upload_metadata, upload_images, upload_screenshots, upload_changelogs]):
             artifact_paths.append(_find_artifact(config, "aab"))
 
         if release_notes:
@@ -221,11 +225,11 @@ def _play_upload(
             )
             upload_changelogs = True
 
-        if any([upload_metadata, upload_images, upload_changelogs]) and not effective_metadata_root:
+        if any([upload_metadata, upload_images, upload_screenshots, upload_changelogs]) and not effective_metadata_root:
             metadata_kind: Literal["metadata", "images", "changelogs"] = "metadata"
-            if upload_images and not upload_metadata and not upload_changelogs:
+            if upload_images and not upload_metadata and not upload_screenshots and not upload_changelogs:
                 metadata_kind = "images"
-            elif upload_changelogs and not upload_metadata and not upload_images:
+            elif upload_changelogs and not upload_metadata and not upload_images and not upload_screenshots:
                 metadata_kind = "changelogs"
             effective_metadata_root = _resolve_metadata_root(config, metadata_root_override, metadata_kind)
 
@@ -237,6 +241,7 @@ def _play_upload(
             "skip_upload_aab": not any(path.suffix == ".aab" for path in artifact_paths),
             "skip_upload_metadata": not upload_metadata,
             "skip_upload_images": not upload_images,
+            "skip_upload_screenshots": not upload_screenshots,
             "skip_upload_changelogs": not upload_changelogs,
             "changes_not_sent_for_review": (
                 config.defaults.changes_not_sent_for_review
@@ -244,6 +249,8 @@ def _play_upload(
                 else changes_not_sent_for_review
             ),
         }
+        if release_status is not None:
+            params["release_status"] = release_status
         if effective_metadata_root:
             params["metadata_path"] = str(effective_metadata_root)
             sensitive_values.append(str(effective_metadata_root))
@@ -588,8 +595,13 @@ def _upload_to_track(
     aab_path: str | None,
     apk_path: str | None,
     release_notes: str | None,
+    release_status: str | None,
     changes_not_sent_for_review: bool | None,
     rollout: float | None,
+    skip_upload_metadata: bool | None,
+    skip_upload_images: bool | None,
+    skip_upload_screenshots: bool | None,
+    skip_upload_changelogs: bool | None,
 ) -> dict[str, Any]:
     try:
         config = _resolve_config(project_root, app_config_path)
@@ -600,8 +612,29 @@ def _upload_to_track(
             aab_path=aab_path,
             apk_path=apk_path,
             release_notes=release_notes,
+            release_status=release_status,
             changes_not_sent_for_review=changes_not_sent_for_review,
             rollout=rollout,
+            upload_metadata=not (
+                config.defaults.skip_upload_metadata
+                if skip_upload_metadata is None
+                else skip_upload_metadata
+            ),
+            upload_images=not (
+                config.defaults.skip_upload_images
+                if skip_upload_images is None
+                else skip_upload_images
+            ),
+            upload_screenshots=not (
+                config.defaults.skip_upload_screenshots
+                if skip_upload_screenshots is None
+                else skip_upload_screenshots
+            ),
+            upload_changelogs=not (
+                config.defaults.skip_upload_changelogs
+                if skip_upload_changelogs is None
+                else skip_upload_changelogs
+            ),
         )
     except FastlaneMCPError as exc:
         return _tool_error(
@@ -617,8 +650,13 @@ def android_upload_to_internal(
     aab_path: str | None = None,
     apk_path: str | None = None,
     release_notes: str | None = None,
+    release_status: str | None = None,
     changes_not_sent_for_review: bool | None = None,
     rollout: float | None = None,
+    skip_upload_metadata: bool | None = None,
+    skip_upload_images: bool | None = None,
+    skip_upload_screenshots: bool | None = None,
+    skip_upload_changelogs: bool | None = None,
 ) -> dict[str, Any]:
     """Upload an Android build to the internal track."""
     return _upload_to_track(
@@ -629,8 +667,13 @@ def android_upload_to_internal(
         aab_path,
         apk_path,
         release_notes,
+        release_status,
         changes_not_sent_for_review,
         rollout,
+        skip_upload_metadata,
+        skip_upload_images,
+        skip_upload_screenshots,
+        skip_upload_changelogs,
     )
 
 
@@ -640,8 +683,13 @@ def android_upload_to_beta(
     aab_path: str | None = None,
     apk_path: str | None = None,
     release_notes: str | None = None,
+    release_status: str | None = None,
     changes_not_sent_for_review: bool | None = None,
     rollout: float | None = None,
+    skip_upload_metadata: bool | None = None,
+    skip_upload_images: bool | None = None,
+    skip_upload_screenshots: bool | None = None,
+    skip_upload_changelogs: bool | None = None,
 ) -> dict[str, Any]:
     """Upload an Android build to the beta track."""
     return _upload_to_track(
@@ -652,8 +700,13 @@ def android_upload_to_beta(
         aab_path,
         apk_path,
         release_notes,
+        release_status,
         changes_not_sent_for_review,
         rollout,
+        skip_upload_metadata,
+        skip_upload_images,
+        skip_upload_screenshots,
+        skip_upload_changelogs,
     )
 
 
@@ -663,8 +716,13 @@ def android_upload_to_production(
     aab_path: str | None = None,
     apk_path: str | None = None,
     release_notes: str | None = None,
+    release_status: str | None = None,
     changes_not_sent_for_review: bool | None = None,
     rollout: float | None = None,
+    skip_upload_metadata: bool | None = None,
+    skip_upload_images: bool | None = None,
+    skip_upload_screenshots: bool | None = None,
+    skip_upload_changelogs: bool | None = None,
 ) -> dict[str, Any]:
     """Upload an Android build to the production track."""
     return _upload_to_track(
@@ -675,8 +733,13 @@ def android_upload_to_production(
         aab_path,
         apk_path,
         release_notes,
+        release_status,
         changes_not_sent_for_review,
         rollout,
+        skip_upload_metadata,
+        skip_upload_images,
+        skip_upload_screenshots,
+        skip_upload_changelogs,
     )
 
 
@@ -706,6 +769,7 @@ def android_promote_track(
                 "skip_upload_aab": True,
                 "skip_upload_metadata": True,
                 "skip_upload_images": True,
+                "skip_upload_screenshots": True,
                 "skip_upload_changelogs": True,
             }
             if rollout is not None:
@@ -833,6 +897,7 @@ def android_upload_images(
             config=config,
             track=validate_track_name(config.default_track),
             upload_images=True,
+            upload_screenshots=True,
             metadata_root_override=images_dir,
         )
     except FastlaneMCPError as exc:
@@ -864,6 +929,11 @@ def android_upload_everything(
     aab_path: str | None = None,
     release_notes: str | None = None,
     track: str | None = None,
+    release_status: str | None = None,
+    skip_upload_metadata: bool | None = None,
+    skip_upload_images: bool | None = None,
+    skip_upload_screenshots: bool | None = None,
+    skip_upload_changelogs: bool | None = None,
 ) -> dict[str, Any]:
     """Upload binary, metadata, images, and changelogs in one call."""
     try:
@@ -874,9 +944,27 @@ def android_upload_everything(
             track=validate_track_name(track or config.default_track),
             aab_path=aab_path,
             release_notes=release_notes,
-            upload_metadata=not config.defaults.skip_upload_metadata,
-            upload_images=not config.defaults.skip_upload_images,
-            upload_changelogs=not config.defaults.skip_upload_changelogs,
+            release_status=release_status,
+            upload_metadata=not (
+                config.defaults.skip_upload_metadata
+                if skip_upload_metadata is None
+                else skip_upload_metadata
+            ),
+            upload_images=not (
+                config.defaults.skip_upload_images
+                if skip_upload_images is None
+                else skip_upload_images
+            ),
+            upload_screenshots=not (
+                config.defaults.skip_upload_screenshots
+                if skip_upload_screenshots is None
+                else skip_upload_screenshots
+            ),
+            upload_changelogs=not (
+                config.defaults.skip_upload_changelogs
+                if skip_upload_changelogs is None
+                else skip_upload_changelogs
+            ),
         )
     except FastlaneMCPError as exc:
         return _tool_error("android_upload_everything", exc)

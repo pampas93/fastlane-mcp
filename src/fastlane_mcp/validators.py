@@ -11,6 +11,13 @@ from typing import Iterable
 from .exceptions import ValidationError
 
 TRACK_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+PLAY_RELEASE_STATUS_MAP = {
+    "completed": "completed",
+    "draft": "draft",
+    "halted": "halted",
+    "inprogress": "inProgress",
+    "in_progress": "inProgress",
+}
 
 
 def bool_from_env(value: str | None, default: bool) -> bool:
@@ -70,6 +77,19 @@ def validate_rollout(rollout: float | None) -> float | None:
     if rollout <= 0 or rollout > 1:
         raise ValidationError("rollout must be greater than 0 and less than or equal to 1.")
     return rollout
+
+
+def validate_play_release_status(release_status: str | None) -> str | None:
+    """Validate and normalize a Google Play release status."""
+    if release_status is None:
+        return None
+    normalized = release_status.strip()
+    if not normalized:
+        raise ValidationError("release_status must not be empty.")
+    canonical = PLAY_RELEASE_STATUS_MAP.get(normalized.lower(), PLAY_RELEASE_STATUS_MAP.get(normalized))
+    if canonical is None:
+        raise ValidationError("release_status must be one of: completed, draft, halted, inProgress.")
+    return canonical
 
 
 def build_gradle_task(kind: str, flavor: str | None, build_type: str | None) -> str | None:

@@ -40,6 +40,7 @@ class DefaultsConfig(BaseModel):
     changes_not_sent_for_review: bool = True
     skip_upload_metadata: bool = False
     skip_upload_images: bool = False
+    skip_upload_screenshots: bool = False
     skip_upload_changelogs: bool = False
 
 

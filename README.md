@@ -269,6 +269,7 @@ defaults:
   changes_not_sent_for_review: true
   skip_upload_metadata: false
   skip_upload_images: false
+  skip_upload_screenshots: false
   skip_upload_changelogs: false
 ```
 
@@ -288,6 +289,7 @@ Important variables:
 - `FASTLANE_MCP_PLAY_JSON_KEY_CONTENT`
 - `GOOGLE_PLAY_JSON_KEY_FILE`
 - `GOOGLE_PLAY_JSON_KEY_CONTENT`
+- `FASTLANE_MCP_DEFAULT_SKIP_UPLOAD_SCREENSHOTS`
 - `FASTLANE_MCP_PLAY_METADATA_DIR`
 - `FASTLANE_MCP_PLAY_IMAGES_DIR`
 - `FASTLANE_MCP_PLAY_CHANGELOGS_DIR`
@@ -347,9 +349,9 @@ Use `android_validate_play_auth` to catch the common failure modes early.
 
 ### Google Play upload / release
 
-- `android_upload_to_internal(project_root, app_config_path?, aab_path?, apk_path?, release_notes?, changes_not_sent_for_review?, rollout?)`
-- `android_upload_to_beta(project_root, app_config_path?, aab_path?, apk_path?, release_notes?, changes_not_sent_for_review?, rollout?)`
-- `android_upload_to_production(project_root, app_config_path?, aab_path?, apk_path?, release_notes?, changes_not_sent_for_review?, rollout?)`
+- `android_upload_to_internal(project_root, app_config_path?, aab_path?, apk_path?, release_notes?, release_status?, changes_not_sent_for_review?, rollout?, skip_upload_metadata?, skip_upload_images?, skip_upload_screenshots?, skip_upload_changelogs?)`
+- `android_upload_to_beta(project_root, app_config_path?, aab_path?, apk_path?, release_notes?, release_status?, changes_not_sent_for_review?, rollout?, skip_upload_metadata?, skip_upload_images?, skip_upload_screenshots?, skip_upload_changelogs?)`
+- `android_upload_to_production(project_root, app_config_path?, aab_path?, apk_path?, release_notes?, release_status?, changes_not_sent_for_review?, rollout?, skip_upload_metadata?, skip_upload_images?, skip_upload_screenshots?, skip_upload_changelogs?)`
 - `android_promote_track(project_root, app_config_path?, from_track, to_track, rollout?)`
 - `android_validate_play_auth(project_root?, app_config_path?)`
 
@@ -358,7 +360,7 @@ Use `android_validate_play_auth` to catch the common failure modes early.
 - `android_upload_metadata(project_root, app_config_path?, metadata_dir?)`
 - `android_upload_images(project_root, app_config_path?, images_dir?)`
 - `android_upload_changelogs(project_root, app_config_path?, changelogs_dir?)`
-- `android_upload_everything(project_root, app_config_path?, aab_path?, release_notes?, track?)`
+- `android_upload_everything(project_root, app_config_path?, aab_path?, release_notes?, track?, release_status?, skip_upload_metadata?, skip_upload_images?, skip_upload_screenshots?, skip_upload_changelogs?)`
 
 ### Introspection
 
@@ -397,10 +399,17 @@ Use `android_validate_play_auth` to catch the common failure modes early.
   "tool": "android_upload_to_internal",
   "arguments": {
     "project_root": "/absolute/path/to/app",
-    "release_notes": "Internal QA build for regression pass."
+    "release_notes": "Internal QA build for regression pass.",
+    "release_status": "draft",
+    "skip_upload_metadata": true,
+    "skip_upload_images": true,
+    "skip_upload_screenshots": true,
+    "skip_upload_changelogs": true
   }
 }
 ```
+
+`release_status` accepts `completed`, `draft`, `halted`, or `inProgress` (`in_progress` is also accepted and normalized).
 
 ### Promote internal to production
 

@@ -1,2 +1,2 @@
-- Manually verify `ios_upload_metadata` and `ios_upload_to_app_store` against a real App Store Connect app with `fastlane/age_rating_config.json` present, and confirm Fastlane applies the age rating in App Store Connect.
-- Decide whether to add iOS build/export tools next so `fastlane-mcp` can produce the IPA before upload instead of only consuming an existing artifact.
+- Manually verify `android_upload_to_internal` against a draft Google Play app using `release_status:draft`, and confirm the MCP tool succeeds without falling back to direct Fastlane.
+- Manually verify partial Android uploads with `skip_upload_metadata`, `skip_upload_images`, `skip_upload_screenshots`, and `skip_upload_changelogs` to confirm the Fastlane wrapper behavior matches the exposed MCP parameters.

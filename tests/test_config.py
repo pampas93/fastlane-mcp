@@ -27,6 +27,18 @@ play:
     assert config.config_path == str(config_path.resolve())
     assert config.apple.metadata_dir == "fastlane/metadata/ios"
     assert config.apple.age_rating_config_path == "fastlane/age_rating_config.json"
+    assert config.defaults.skip_upload_screenshots is False
+
+
+def test_load_app_config_reads_default_skip_upload_screenshots_from_env(monkeypatch, tmp_path: Path) -> None:
+    project_root = tmp_path / "example-app"
+    project_root.mkdir()
+
+    monkeypatch.setenv("FASTLANE_MCP_DEFAULT_SKIP_UPLOAD_SCREENSHOTS", "true")
+
+    config = load_app_config(project_root=str(project_root))
+
+    assert config.defaults.skip_upload_screenshots is True
 
 
 def test_load_ios_config_from_file_and_env(monkeypatch, tmp_path: Path) -> None:
