@@ -3,7 +3,9 @@ from pathlib import Path
 from fastlane_mcp.android_tools import _build_fastlane_command
 from fastlane_mcp.ios_tools import (
     _build_pilot_command,
+    _apple_testflight_params,
     _extract_build_number,
+    ios_upload_to_testflight,
     ios_show_effective_config,
     ios_upload_metadata,
     ios_upload_to_app_store,
@@ -46,10 +48,42 @@ def test_build_pilot_command_uses_bundler_context() -> None:
     assert cwd == Path.cwd()
 
 
+def test_apple_testflight_params_use_app_platform() -> None:
+    config = AppConfig(project_root=str(Path.cwd()))
+
+    params = _apple_testflight_params(config, "com.example.app")
+
+    assert params["app_platform"] == "ios"
+    assert "platform" not in params
+
+
 def test_extract_build_number_returns_last_integer() -> None:
     output = "Latest build numbers:\n42\nApp Store build number: 41"
 
     assert _extract_build_number(output) == 41
+
+
+def test_ios_upload_to_testflight_uses_app_platform(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("FASTLANE_MCP_BUNDLE_IDENTIFIER", "com.example.app")
+    monkeypatch.setenv("FASTLANE_MCP_APPLE_API_KEY_CONTENT", "{}")
+    project_root = tmp_path / "ios-app"
+    project_root.mkdir()
+    (project_root / "ios").mkdir()
+    ipa_path = project_root / "ios" / "build.ipa"
+    ipa_path.write_text("ipa", encoding="utf-8")
+    captured: dict[str, object] = {}
+    _stub_run_command(monkeypatch, captured)
+
+    result = ios_upload_to_testflight(
+        project_root=str(project_root),
+        ipa_path=str(ipa_path),
+    )
+
+    assert result["success"] is True
+    command = captured["command"]
+    assert isinstance(command, list)
+    assert any(item == "app_platform:ios" for item in command)
+    assert not any(item == "platform:ios" for item in command)
 
 
 def _write_ios_upload_fixture(project_root: Path) -> tuple[Path, Path, Path]:

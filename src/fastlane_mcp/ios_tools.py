@@ -100,6 +100,15 @@ def _apple_common_params(config: AppConfig, bundle_identifier: str) -> dict[str,
     return params
 
 
+def _apple_testflight_params(config: AppConfig, bundle_identifier: str) -> dict[str, Any]:
+    params = _apple_common_params(config, bundle_identifier)
+    # Fastlane's TestFlight upload action expects `app_platform`, while other
+    # App Store actions still use `platform`.
+    params["app_platform"] = config.apple.default_platform
+    params.pop("platform", None)
+    return params
+
+
 def _build_pilot_command(
     config: AppConfig,
     *,
@@ -137,7 +146,7 @@ def ios_upload_to_testflight(
                 "distribute_external": distribute_external,
                 "notify_external_testers": notify_external_testers,
                 "expire_previous_builds": expire_previous_builds,
-                **_apple_common_params(config, bundle_identifier),
+                **_apple_testflight_params(config, bundle_identifier),
             }
             sensitive_values.append(str(ipa))
             command, cwd, sensitive_values = _build_fastlane_command(
@@ -190,7 +199,7 @@ def ios_distribute_testflight_build(
                 "notify_external_testers": notify_external_testers,
                 "app_version": app_version,
                 "build_number": build_number,
-                **_apple_common_params(config, bundle_identifier),
+                **_apple_testflight_params(config, bundle_identifier),
             }
             command, cwd, sensitive_values = _build_fastlane_command(
                 config,
