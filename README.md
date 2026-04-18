@@ -1,251 +1,191 @@
 # fastlane-mcp
 
-`fastlane-mcp` is a local, open-source MCP server that exposes a clean tool interface over Android and iOS release workflows powered by Gradle and fastlane.
+`fastlane-mcp` is a local MCP server that wraps Gradle and fastlane so coding agents can publish Android and iOS apps through Google Play and App Store Connect with a stable tool surface.
 
-It is designed for this exact setup:
+This repo is meant to be reused across many app repos. The app-specific state lives in a small `fastlane-mcp.yaml` file inside each target app.
 
-- This repo is the MCP server repo, not an individual app repo.
-- Target apps are existing Android or React Native apps.
-- Each app should provide a small config file or environment variables instead of duplicating a large `fastlane/` setup.
-- v1 is local-first and optimized for Google Play and App Store Connect release flows.
+## What It Is Good At Today
 
-## Why put MCP on top of fastlane?
+`P0`: publishing release binaries
 
-fastlane already solves most of the Android / Google Play release problem well. What it does not give you by default is a stable, LLM-friendly tool surface that can be reused across many app repos.
+- Android: build AAB or APK with Gradle, then upload to Google Play
+- iOS: upload an existing IPA to TestFlight or App Store Connect
+- Both: inspect latest store build numbers, validate auth, and expose the effective config an agent will use
 
-`fastlane-mcp` adds that layer:
+`P1`: listing assets and metadata
 
-- Thin MCP wrapper over real fastlane and Gradle commands
-- Strong input validation and clearer failure messages
-- Structured responses for agents and humans
-- A reusable app config contract for many future React Native apps
-- Local debugging without hiding the underlying commands
+- Android metadata, screenshots, images, changelogs
+- iOS metadata, screenshots, privacy details, age rating config
 
-The design goal is not to replace fastlane. It is to make fastlane easier to consume from MCP clients and easier to standardize across multiple Android app repos.
+## Is It Generic Enough Yet
 
-## Scope
+Short answer: `yes` for the core publish flow, with one important caveat.
 
-### Included in v1
+What is already generic:
 
-- Local MCP server over stdio
-- Android AAB and APK builds via Gradle
-- Google Play uploads via fastlane `upload_to_play_store`
-- Metadata, image, and changelog uploads
-- Track promotion
-- Play auth validation
-- iOS TestFlight uploads and distribution
-- App Store uploads for binaries, metadata, screenshots, and privacy details
-- App creation, precheck, build-number introspection, and signing sync
-- Effective config inspection
-- Basic doctor / healthcheck workflows
+- The server is app-agnostic. It only needs a `project_root` plus a small per-app config file.
+- Argus and LunaCradle both use the same config contract:
+  - Argus: [mobile/fastlane-mcp.yaml](/Users/abhi/Projects/argus/mobile/fastlane-mcp.yaml)
+  - LunaCradle: [app/fastlane-mcp.yaml](/Users/abhi/Projects/lunacradle/app/fastlane-mcp.yaml)
+- The Android and iOS publish tools are parameterized by package ID, bundle ID, artifact globs, metadata paths, and credentials.
+- The tool surface is already stable enough for an agent to:
+  - read latest build numbers
+  - validate store auth
+  - upload an Android AAB to Play
+  - upload an IPA to TestFlight
 
-### Non-goals in v1
+Important current caveat:
 
-- Cloud hosting
-- Checking Play credentials into source control
-- Replacing the need for an app that already exists in Play Console
+- Android build and upload are both genericized inside MCP.
+- iOS upload is genericized, but iOS archive and IPA export are not wrapped as MCP tools yet.
+- In practice, the generic flow today is:
+  - build Android AAB inside `fastlane-mcp`
+  - produce iOS IPA with `xcodebuild`, Xcode, EAS, or another app-local workflow
+  - upload the IPA through `fastlane-mcp`
 
-## Architecture
+That means this repo is ready as a generic publish server for Android and for iOS upload. It is not yet a fully generic end-to-end iOS build server.
 
-The codebase is intentionally small and thin:
+## How The Server Works
 
-- `src/fastlane_mcp/server.py`
-  FastMCP entrypoint and tool registration
-- `src/fastlane_mcp/config.py`
-  Config discovery, YAML loading, env expansion, merge rules
-- `src/fastlane_mcp/models.py`
-  Typed Pydantic models for config and responses
-- `src/fastlane_mcp/fastlane_runner.py`
-  Safe subprocess execution, Bundler detection, output normalization
-- `src/fastlane_mcp/android_tools.py`
-  Tool implementations for Android build, upload, metadata, diagnostics, and introspection flows
-- `src/fastlane_mcp/ios_tools.py`
-  Tool implementations for TestFlight, App Store Connect, and signing flows
-- `src/fastlane_mcp/validators.py`
-  Input validation and artifact lookup helpers
-- `src/fastlane_mcp/exceptions.py`
-  Purpose-specific error classes
-- `examples/fastlane-mcp.yaml`
-  Example per-app config
-- `tests/`
-  Basic validation and command-generation tests
+The server is intentionally thin:
 
-## How it works
+- [src/fastlane_mcp/server.py](src/fastlane_mcp/server.py): MCP entrypoint and tool registration
+- [src/fastlane_mcp/config.py](src/fastlane_mcp/config.py): config discovery and environment expansion
+- [src/fastlane_mcp/android_tools.py](src/fastlane_mcp/android_tools.py): Android build and Play publishing
+- [src/fastlane_mcp/ios_tools.py](src/fastlane_mcp/ios_tools.py): TestFlight and App Store publishing
+- [src/fastlane_mcp/fastlane_runner.py](src/fastlane_mcp/fastlane_runner.py): subprocess execution and Bundler detection
+- [examples/fastlane-mcp.yaml](examples/fastlane-mcp.yaml): app-level config example
 
-### Build operations
+The design is:
 
-Build tools call Gradle directly. This keeps the app-side setup minimal and avoids requiring a large app-local fastlane lane setup for routine builds.
+- use Gradle directly for Android builds
+- use fastlane directly for store upload and store-management operations
+- prefer `bundle exec fastlane ...` when the target app repo has a `Gemfile`
+- keep app repos small by avoiding custom fastlane lane code unless the app already needs it
 
-### Google Play operations
+## Tool Surface
 
-Upload and Play inspection tools call fastlane through the local CLI:
+The current server registers these publish-relevant tools:
 
-- Prefer `bundle exec fastlane ...` when a `Gemfile` is present in the app root or Android directory
-- Otherwise fall back to `fastlane ...`
+- Android:
+  - `doctor`
+  - `android_build_aab`
+  - `android_build_apk`
+  - `android_validate_play_auth`
+  - `android_get_latest_build_info`
+  - `android_upload_to_internal`
+  - `android_upload_to_beta`
+  - `android_upload_to_production`
+  - `android_promote_track`
+  - `android_upload_metadata`
+  - `android_upload_images`
+  - `android_upload_changelogs`
+  - `android_upload_everything`
+  - `android_show_effective_config`
+- iOS:
+  - `ios_get_latest_build_info`
+  - `ios_upload_to_testflight`
+  - `ios_distribute_testflight_build`
+  - `ios_upload_to_app_store`
+  - `ios_upload_metadata`
+  - `ios_upload_screenshots`
+  - `ios_upload_app_privacy_details`
+  - `ios_precheck`
+  - `ios_sync_code_signing`
+  - `ios_create_app`
+  - `ios_show_effective_config`
 
-This keeps the server compatible with apps that already use Bundler while still working for apps that only have fastlane installed globally.
+## What Other App Repos Need
 
-### Release notes behavior
+Every target app needs two classes of setup:
 
-fastlane's Android upload flow is metadata-oriented. It does not accept an arbitrary inline `release_notes` flag in the same way some custom wrappers do. When a tool call includes `release_notes`, `fastlane-mcp` creates a temporary supply-compatible changelog overlay and passes that to fastlane instead of inventing unsupported behavior.
+1. App-repo configuration
+2. Store-console credentials and permissions
 
-## Prerequisites
+### App-repo requirements
 
-### Required
+Minimum:
 
-- Python 3.11+
-- Ruby
-- fastlane
-- An Android app project with a working Gradle build
-- A Play Console app that already exists
-- A Google service account with Play Console API access and app permissions
+- the app already builds locally
+- the app has a `fastlane-mcp.yaml` file
+- Android apps have a working Gradle wrapper or `gradle` on PATH
+- iOS apps can already produce an `.ipa` through Xcode, `xcodebuild`, or another existing flow
+- the app repo has fastlane installed globally or via Bundler
 
-### Usually recommended
+Recommended:
 
-- Bundler and a `Gemfile` in the target app repo
-- Android SDK / Java set up correctly for the target app
-- A supply-compatible metadata tree such as `fastlane/metadata/android`
+- keep fastlane in the app repo `Gemfile`
+- keep Android metadata under `fastlane/metadata/android`
+- keep iOS metadata under `fastlane/metadata/ios`
+- keep iOS screenshots under `fastlane/screenshots`
 
-## Install
+### Google Play requirements
 
-### Server repo setup
+Before `fastlane-mcp` can upload an AAB:
 
-1. Clone this repo.
-2. Create a virtual environment.
-3. Install the package.
+1. Create the app in Play Console manually.
+2. Create a Google Cloud service account.
+3. Enable the Android Publisher API in the Google Cloud project.
+4. Download the service-account JSON key.
+5. In Play Console:
+   - open `Users and permissions`
+   - invite that service account
+   - grant the app-level permissions needed for releases
+6. Put the JSON key somewhere on disk and point `play.json_key_file` to it, or provide the JSON content via environment variable.
 
-Example with `pip`:
+Important:
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-```
+- `fastlane-mcp` does not create the Play app listing for you.
+- version codes must always increase.
+- draft/internal-track behavior still depends on Play Console state; for first uploads, `release_status:draft` is often the safest choice.
 
-On Windows PowerShell:
+### Apple / App Store Connect requirements
 
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
-```
+Before `fastlane-mcp` can upload an IPA:
 
-If you prefer `uv`, that also works fine:
+1. Create the app in App Store Connect manually, or use `ios_create_app`.
+2. Create an App Store Connect API key.
+3. Store the API key as either:
+   - a JSON descriptor file, then point `apple.api_key_path` at it
+   - raw JSON content via `FASTLANE_MCP_APPLE_API_KEY_CONTENT`
+4. Make sure the app can already archive and export a valid `.ipa`.
+5. Make sure the build number always increases.
 
-```bash
-uv venv
-source .venv/bin/activate
-uv pip install -e ".[dev]"
-```
+Important:
 
-### fastlane setup
+- `ios_upload_to_testflight` uploads an IPA. It does not produce that IPA.
+- App Store Connect rejects re-uploads of a build number that already exists.
+- If a client times out while Apple is uploading, App Store Connect may still accept the build. Always confirm with `ios_get_latest_build_info`.
 
-Install fastlane in the way your team prefers. Two common options:
+## Per-App Config
 
-- Global fastlane install
-- Bundler-managed fastlane inside each app repo
+Each app should carry a small file named `fastlane-mcp.yaml`.
 
-If an app repo has a `Gemfile`, `fastlane-mcp` will prefer `bundle exec fastlane`.
-
-## Local usage
-
-Run the server locally over stdio:
-
-```bash
-fastlane-mcp
-```
-
-or:
-
-```bash
-python -m fastlane_mcp
-```
-
-## MCP client config examples
-
-Different clients use slightly different config formats. The common idea is the same: register a local stdio server.
-
-Generic example:
-
-```json
-{
-  "mcpServers": {
-    "fastlane-mcp": {
-      "command": "/absolute/path/to/.venv/bin/fastlane-mcp",
-      "args": [],
-      "env": {
-        "FASTLANE_MCP_LOG_LEVEL": "INFO"
-      }
-    }
-  }
-}
-```
-
-Windows example:
-
-```json
-{
-  "mcpServers": {
-    "fastlane-mcp": {
-      "command": "C:\\Projects\\fastlane-mcp\\.venv\\Scripts\\fastlane-mcp.exe",
-      "args": [],
-      "env": {
-        "FASTLANE_MCP_LOG_LEVEL": "INFO"
-      }
-    }
-  }
-}
-```
-
-If your client expects `python -m ...` instead of the console script:
-
-```json
-{
-  "mcpServers": {
-    "fastlane-mcp": {
-      "command": "/absolute/path/to/.venv/bin/python",
-      "args": ["-m", "fastlane_mcp"]
-    }
-  }
-}
-```
-
-## Configuration model
-
-`fastlane-mcp` supports two styles:
-
-- Global environment variables
-- Per-app config file
-
-Supported config file discovery:
+Supported discovery paths:
 
 - `fastlane-mcp.yaml`
 - `fastlane-mcp.yml`
 - `.fastlane-mcp/app.yaml`
 - `.fastlane-mcp/app.yml`
 
-Merge precedence is:
+### Generic example
 
-1. Explicit tool arguments
-2. Environment variables
-3. App config file
-4. Built-in defaults
-
-### Example app config
-
-See `examples/fastlane-mcp.yaml`.
+See [examples/fastlane-mcp.yaml](examples/fastlane-mcp.yaml).
 
 ```yaml
-app_name: Example RN App
-platform: android
+app_name: Example App
+platform: react-native
 project_root: /absolute/path/to/app
 android_dir: android
+ios_dir: ios
 package_name: com.example.app
+bundle_identifier: com.example.app
 default_track: internal
 
 artifacts:
   aab_glob: android/app/build/outputs/bundle/**/*.aab
   apk_glob: android/app/build/outputs/apk/**/*.apk
+  ipa_glob: ios/build/**/*.ipa
 
 play:
   json_key_file: ${GOOGLE_PLAY_JSON_KEY_FILE}
@@ -256,10 +196,12 @@ play:
 
 apple:
   api_key_path: ${APP_STORE_CONNECT_API_KEY_PATH}
+  username: ${FASTLANE_USER}
   metadata_dir: fastlane/metadata/ios
   screenshots_dir: fastlane/screenshots
   privacy_details_path: fastlane/app_privacy_details.json
   age_rating_config_path: fastlane/age_rating_config.json
+  default_platform: ios
 
 gradle:
   build_aab_task: bundleRelease
@@ -273,298 +215,265 @@ defaults:
   skip_upload_changelogs: false
 ```
 
-### Environment variables
+### Real app examples
 
-See `.env.example`.
+Argus:
 
-Important variables:
+- uses an absolute `project_root`
+- stores the exported IPA under `/tmp/argus-ios/export/**/*.ipa`
+- points `apple.api_key_path` at a checked-in local JSON descriptor file
+
+LunaCradle:
+
+- uses the same structure
+- keeps the IPA glob under `ios/build/**/*.ipa`
+- resolves the App Store Connect key path through an environment variable
+
+Those two examples are a useful proof that the config model is already reusable across different apps without changing the server code.
+
+## Environment Variables
+
+The server supports both config-file values and env-based overrides.
+
+Common ones:
 
 - `FASTLANE_MCP_PROJECT_ROOT`
-- `FASTLANE_MCP_ANDROID_DIR`
-- `FASTLANE_MCP_PACKAGE_NAME`
-- `FASTLANE_MCP_DEFAULT_TRACK`
-- `FASTLANE_MCP_AAB_GLOB`
-- `FASTLANE_MCP_APK_GLOB`
-- `FASTLANE_MCP_PLAY_JSON_KEY_FILE`
-- `FASTLANE_MCP_PLAY_JSON_KEY_CONTENT`
 - `GOOGLE_PLAY_JSON_KEY_FILE`
 - `GOOGLE_PLAY_JSON_KEY_CONTENT`
-- `FASTLANE_MCP_DEFAULT_SKIP_UPLOAD_SCREENSHOTS`
-- `FASTLANE_MCP_PLAY_METADATA_DIR`
-- `FASTLANE_MCP_PLAY_IMAGES_DIR`
-- `FASTLANE_MCP_PLAY_CHANGELOGS_DIR`
-- `FASTLANE_MCP_PLAY_DEFAULT_LANGUAGE`
-- `FASTLANE_MCP_APPLE_AGE_RATING_CONFIG_PATH`
-- `FASTLANE_MCP_GRADLE_BUILD_AAB_TASK`
-- `FASTLANE_MCP_GRADLE_BUILD_APK_TASK`
-- `FASTLANE_MCP_DEFAULT_CHANGES_NOT_SENT_FOR_REVIEW`
-- `FASTLANE_MCP_DEFAULT_SKIP_UPLOAD_METADATA`
-- `FASTLANE_MCP_DEFAULT_SKIP_UPLOAD_IMAGES`
-- `FASTLANE_MCP_DEFAULT_SKIP_UPLOAD_CHANGELOGS`
-- `FASTLANE_MCP_TIMEOUT_SECONDS`
+- `FASTLANE_MCP_APPLE_API_KEY_PATH`
+- `FASTLANE_MCP_APPLE_API_KEY_CONTENT`
+- `FASTLANE_MCP_APPLE_USERNAME`
 - `FASTLANE_MCP_LOG_LEVEL`
+- `FASTLANE_MCP_TIMEOUT_SECONDS`
 
-## Google Play auth setup
+Merge precedence is:
 
-Supported patterns:
+1. explicit tool arguments
+2. environment variables
+3. app config file
+4. built-in defaults
 
-- Service account JSON file path
-- Service account JSON content via env var
+## Installation
 
-If JSON content is provided through env vars, the server writes it to a temporary file at runtime so it can call fastlane safely without exposing raw JSON in command arguments.
+### 1. Clone the MCP server repo
 
-### iOS metadata and age ratings
-
-If your app repo includes `fastlane/age_rating_config.json`, add this to `fastlane-mcp.yaml`:
-
-```yaml
-apple:
-  age_rating_config_path: fastlane/age_rating_config.json
+```bash
+git clone /path/to/fastlane-mcp
+cd fastlane-mcp
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
 ```
 
-`ios_upload_metadata` and `ios_upload_to_app_store` will pass that file to fastlane as `app_rating_config_path`, which uploads the App Store age rating through the normal metadata flow.
+### 2. Make sure fastlane is available
 
-### Required Play Console setup
+Preferred:
 
-The credentials are not enough by themselves. The service account must also:
+- install fastlane in each target app repo with Bundler
 
-- Be linked in Play Console API access
-- Be granted access to the target app
-- Have the permissions required for the action you want to run
+Also supported:
 
-Use `android_validate_play_auth` to catch the common failure modes early.
+- global `fastlane` install on PATH
 
-## Supported tools
+### 3. Make sure the app repo is ready
 
-### Discovery / diagnostics
+For Android:
 
-- `healthcheck()`
-- `doctor(project_root, app_config_path?)`
-- `list_supported_actions()`
+- Gradle wrapper works
+- package name is final
+- signing/build config is already valid
 
-### Build
+For iOS:
 
-- `android_build_aab(project_root, app_config_path?, flavor?, build_type?, gradle_task?, clean?)`
-- `android_build_apk(project_root, app_config_path?, flavor?, build_type?, gradle_task?, clean?)`
+- app archives locally
+- IPA export flow already works
+- bundle identifier matches App Store Connect app
 
-### Google Play upload / release
+## Running The MCP Server
 
-- `android_upload_to_internal(project_root, app_config_path?, aab_path?, apk_path?, release_notes?, release_status?, changes_not_sent_for_review?, rollout?, skip_upload_metadata?, skip_upload_images?, skip_upload_screenshots?, skip_upload_changelogs?)`
-- `android_upload_to_beta(project_root, app_config_path?, aab_path?, apk_path?, release_notes?, release_status?, changes_not_sent_for_review?, rollout?, skip_upload_metadata?, skip_upload_images?, skip_upload_screenshots?, skip_upload_changelogs?)`
-- `android_upload_to_production(project_root, app_config_path?, aab_path?, apk_path?, release_notes?, release_status?, changes_not_sent_for_review?, rollout?, skip_upload_metadata?, skip_upload_images?, skip_upload_screenshots?, skip_upload_changelogs?)`
-- `android_promote_track(project_root, app_config_path?, from_track, to_track, rollout?)`
-- `android_validate_play_auth(project_root?, app_config_path?)`
+```bash
+source /absolute/path/to/fastlane-mcp/.venv/bin/activate
+fastlane-mcp
+```
 
-### Metadata / store listing
+or:
 
-- `android_upload_metadata(project_root, app_config_path?, metadata_dir?)`
-- `android_upload_images(project_root, app_config_path?, images_dir?)`
-- `android_upload_changelogs(project_root, app_config_path?, changelogs_dir?)`
-- `android_upload_everything(project_root, app_config_path?, aab_path?, release_notes?, track?, release_status?, skip_upload_metadata?, skip_upload_images?, skip_upload_screenshots?, skip_upload_changelogs?)`
+```bash
+python -m fastlane_mcp
+```
 
-### Introspection
+## MCP Client Setup
 
-- `android_get_latest_build_info(project_root, app_config_path?, track?)`
-- `android_show_effective_config(project_root?, app_config_path?)`
+Any MCP client that can launch a local stdio server can use this repo.
 
-## Example tool calls
-
-### Validate a target app
+Generic config shape:
 
 ```json
 {
-  "tool": "doctor",
-  "arguments": {
-    "project_root": "/absolute/path/to/app"
+  "mcpServers": {
+    "fastlane-mcp": {
+      "command": "/absolute/path/to/fastlane-mcp/.venv/bin/fastlane-mcp",
+      "args": [],
+      "env": {
+        "FASTLANE_MCP_LOG_LEVEL": "INFO"
+      }
+    }
   }
 }
 ```
 
-### Build an AAB
+If the client prefers `python -m`:
 
 ```json
 {
-  "tool": "android_build_aab",
-  "arguments": {
-    "project_root": "/absolute/path/to/app",
-    "clean": true
+  "mcpServers": {
+    "fastlane-mcp": {
+      "command": "/absolute/path/to/fastlane-mcp/.venv/bin/python",
+      "args": ["-m", "fastlane_mcp"]
+    }
   }
 }
 ```
 
-### Upload the latest AAB to internal testing
+Use the same idea in Codex, Claude Code, Cursor, or any other MCP-capable client: register this repo as a local stdio MCP server.
 
-```json
-{
-  "tool": "android_upload_to_internal",
-  "arguments": {
-    "project_root": "/absolute/path/to/app",
-    "release_notes": "Internal QA build for regression pass.",
-    "release_status": "draft",
-    "skip_upload_metadata": true,
-    "skip_upload_images": true,
-    "skip_upload_screenshots": true,
-    "skip_upload_changelogs": true
-  }
-}
+## Recommended Publish Flow
+
+### Android release flow
+
+This is the most complete generic flow today.
+
+1. Validate setup:
+
+```text
+Run `doctor` for /path/to/app
+Run `android_validate_play_auth` for /path/to/app
+Run `android_get_latest_build_info` for the internal track
 ```
 
-`release_status` accepts `completed`, `draft`, `halted`, or `inProgress` (`in_progress` is also accepted and normalized).
+2. Build:
 
-### Promote internal to production
-
-```json
-{
-  "tool": "android_promote_track",
-  "arguments": {
-    "project_root": "/absolute/path/to/app",
-    "from_track": "internal",
-    "to_track": "production",
-    "rollout": 0.1
-  }
-}
+```text
+Run `android_build_aab` for /path/to/app
 ```
 
-### Show resolved config
+3. Upload:
 
-```json
-{
-  "tool": "android_show_effective_config",
-  "arguments": {
-    "project_root": "/absolute/path/to/app"
-  }
-}
+```text
+Run `android_upload_to_internal` using the latest AAB
 ```
 
-## Recommended app setup
+4. Verify:
 
-This server tries hard not to require a large app-side fastlane setup, but a small amount of discipline in each app repo still helps.
+```text
+Run `android_get_latest_build_info` for the internal track
+```
 
-Recommended for each React Native app:
+### iOS release flow
 
-- Keep a stable Gradle wrapper in `android/`
-- Keep artifact locations predictable
-- Keep a small app config file such as `fastlane-mcp.yaml`
-- Keep Play metadata under `fastlane/metadata/android`
-- Optionally keep a `Gemfile` for reproducible fastlane versions
+This is the correct generic flow today.
 
-### Minimal app-side setup
+1. Confirm latest build number:
 
-You do not need a large `fastlane/Fastfile` to use v1.
+```text
+Run `ios_get_latest_build_info` for /path/to/app
+```
 
-For many apps, this is enough:
+2. Bump build number in the app repo.
 
-- Gradle wrapper
-- Service account credentials provided at runtime
-- A supply-compatible metadata directory if you upload listing content
-- Optional `Gemfile`
+3. Produce a fresh `.ipa` using Xcode, `xcodebuild`, EAS, or the app’s existing build pipeline.
 
-### When a small app-local fastlane setup is still worth it
+4. Upload:
 
-You may still want a tiny app-side fastlane setup if you need:
+```text
+Run `ios_upload_to_testflight` using the fresh IPA
+```
 
-- App-specific Ruby plugin dependencies
-- Existing team workflows already built around Bundler
-- Custom lanes outside the scope of this MCP server
+5. Verify:
 
-## Response shape
+```text
+Run `ios_get_latest_build_info`
+```
 
-Tool responses are structured for LLM consumption and manual debugging. Most command-based tools return:
+## Example Agent Prompts
 
-- `success`
-- `message`
-- `command`
-- `command_display`
-- `cwd`
-- `return_code`
-- `stdout_excerpt`
-- `stderr_excerpt`
-- `artifact_paths`
-- `warnings`
-- `next_steps`
-- `data`
+These are the kinds of prompts a developer can use in Codex, Claude Code, or Cursor once the server is connected.
 
-Sensitive values are redacted from command display output.
+### Android
 
-## Troubleshooting
+```text
+Use fastlane-mcp to run doctor for /Users/me/Projects/MyApp.
+```
 
-### `fastlane` not found
+```text
+Use fastlane-mcp to show the effective config for /Users/me/Projects/MyApp.
+```
 
-- Install fastlane globally or via Bundler
-- If using Bundler, make sure `bundle` is installed and a `Gemfile` exists in the app repo
+```text
+Use fastlane-mcp to build the Android AAB for /Users/me/Projects/MyApp.
+```
 
-### Play auth validates but uploads still fail
+```text
+Use fastlane-mcp to upload the latest Android AAB for /Users/me/Projects/MyApp to the internal Play track as a draft release.
+```
 
-- Confirm the service account is linked in Play Console API access
-- Confirm the app exists in Play Console already
-- Confirm the service account has permissions on that specific app
+### iOS
 
-### Metadata upload fails
+```text
+Use fastlane-mcp to tell me the latest TestFlight build number for /Users/me/Projects/MyApp.
+```
 
-- Check that your metadata tree matches fastlane / supply expectations
-- Prefer using a single root such as `fastlane/metadata/android`
-- Point `metadata_dir`, `images_dir`, and `changelogs_dir` to that root unless you have a strong reason not to
+```text
+Use fastlane-mcp to upload /tmp/MyApp.ipa to TestFlight for /Users/me/Projects/MyApp.
+```
 
-### Artifact not found
+### Combined release prompts
 
-- Check your configured `aab_glob` / `apk_glob`
-- Build first
-- Or pass an explicit `aab_path` / `apk_path`
+```text
+Use fastlane-mcp to validate Android Play auth and upload the latest AAB to the internal track for /Users/me/Projects/MyApp.
+```
 
-### Gradle wrapper not found
+```text
+Use fastlane-mcp to upload the IPA at /tmp/MyApp.ipa to TestFlight and then verify the latest build number.
+```
 
-- Keep `android/gradlew` or `android/gradlew.bat` in the target repo
-- The server will fall back to `gradle` if available, but the wrapper is preferred
+## Current Caveats
 
-## Security notes
+These are important if you want to use this as a shared generic repo:
 
-- Do not commit Play service account JSON files into source control
-- Prefer environment variables or secure local secret management
-- The server avoids printing raw secret content
-- The server redacts JSON key paths in command display output
-- Commands are executed with `subprocess.run(..., shell=False)`
+- iOS upload is generic, but iOS archive/export is still outside the MCP tool surface.
+- App Store Connect build numbers must increase every upload.
+- Google Play version codes must increase every upload.
+- First-store setup is still partly manual:
+  - create the app listing
+  - create service accounts / API keys
+  - grant permissions
+- Some clients may time out before Apple finishes uploading. When that happens, verify actual success with `ios_get_latest_build_info` instead of assuming failure.
+
+## When To Use This Repo
+
+Use `fastlane-mcp` when:
+
+- you want one local MCP server to publish many app repos
+- you want agents to ship Android and iOS binaries through a consistent interface
+- you want app repos to stay small and config-driven
+
+Do not oversell it as:
+
+- a full replacement for native iOS build tooling
+- a zero-setup replacement for Play Console or App Store Connect onboarding
 
 ## Development
 
 Run tests:
 
 ```bash
-PYTHONPATH=src pytest
+pytest
 ```
 
-On Windows PowerShell:
+Useful files while extending the server:
 
-```powershell
-$env:PYTHONPATH='src'
-python -m pytest
-```
-
-## Roadmap
-
-- Better parsing of fastlane output into richer structured data
-- Optional generated ephemeral Fastfiles for more advanced fastlane scenarios
-- Better support for custom closed testing tracks and richer rollout flows
-- More end-to-end tests against fixture projects
-- Optional iOS support in a later major expansion
-
-## Contributing
-
-Issues and pull requests are welcome.
-
-Good contributions for early versions:
-
-- Better test coverage
-- More robust output parsing
-- Additional validation around Play metadata layouts
-- Documentation improvements for real-world React Native repos
-
-When contributing:
-
-- Keep the MCP layer thin
-- Prefer official fastlane capabilities over custom behavior
-- Keep secrets out of logs and source control
-- Preserve structured, LLM-friendly responses
-
-## License
-
-MIT. See `LICENSE`.
+- [src/fastlane_mcp/android_tools.py](src/fastlane_mcp/android_tools.py)
+- [src/fastlane_mcp/ios_tools.py](src/fastlane_mcp/ios_tools.py)
+- [tests/test_android_tools.py](tests/test_android_tools.py)
+- [tests/test_ios_tools.py](tests/test_ios_tools.py)

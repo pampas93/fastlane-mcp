@@ -1,2 +1,4 @@
+- Add a first-class iOS archive/export tool or document a blessed `xcodebuild` helper so iOS build plus upload becomes fully generic, not just IPA upload.
+- Manually verify the documented setup flow against one non-React-Native sample app so the README does not overfit Argus and LunaCradle.
 - Manually verify `android_upload_to_internal` against a draft Google Play app using `release_status:draft`, and confirm the MCP tool succeeds without falling back to direct Fastlane.
 - Manually verify partial Android uploads with `skip_upload_metadata`, `skip_upload_images`, `skip_upload_screenshots`, and `skip_upload_changelogs` to confirm the Fastlane wrapper behavior matches the exposed MCP parameters.
