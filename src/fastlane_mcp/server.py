@@ -39,6 +39,7 @@ from .ios_tools import (
     ios_upload_to_app_store,
     ios_upload_to_testflight,
 )
+from .store_listing_tools import store_listing_requirements
 
 
 def configure_logging() -> None:
@@ -64,6 +65,7 @@ mcp = FastMCP(
 mcp.tool(healthcheck)
 mcp.tool(doctor)
 mcp.tool(list_supported_actions)
+mcp.tool(store_listing_requirements)
 mcp.tool(android_build_aab)
 mcp.tool(android_build_apk)
 mcp.tool(android_upload_to_internal)
